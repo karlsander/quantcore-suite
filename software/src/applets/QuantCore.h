@@ -3,6 +3,8 @@
 #include "../quantcore/module.h"
 
 class QCApplet : public HemisphereApplet {
+ public:
+  bool wantsQWire() override { return true; }
  protected:
   void link() {
     gfxPrint(0, 52, qc::timerFault ? "Timer err" : (qc::haveH || qc::haveR ? "TR3 QWire" : "TR3 wait"));

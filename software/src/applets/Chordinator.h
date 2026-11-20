@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-class Chordinator : public HemisphereApplet {
+class Chordinator : public HarmonyApplet<qc::ChordOnly> {
 public:
   const char *applet_name() { return "Chordnate"; }
   const uint8_t* applet_icon() { return PhzIcons::chordinate; }
@@ -40,6 +40,16 @@ public:
       }
     }
 
+    if (source()) {
+      Out(0, qc::rootCV());
+      if (continuous[1] || EndOfADCLag(1)) {
+        const auto& tones = qc::notes(qc::BusChord);
+        int i = tones.nearest(In(1), true);
+        if (i >= 0) harm_pitch = tones.pitch(i);
+        Out(1, harm_pitch);
+      }
+      return;
+    }
     if (continuous[0] || EndOfADCLag(0)) {
       chord_root_raw = In(0);
       int32_t new_root_pitch =
@@ -59,6 +69,12 @@ public:
   }
 
   void View() {
+    if (source()) {
+      gfxPrint(0, 15, "QC Root");
+      gfxPrint(0, 30, qc::harmony.root); gfxPrint(" semi");
+      gfxPrint(0, 45, "QC Chord");
+      return;
+    }
     gfxPrint(0, 15, OC::scale_names_short[GetScale(0)]);
     if (cursor == 0) gfxCursor(0, 23, 30);
 
@@ -87,6 +103,7 @@ public:
   }
 
   void OnButtonPress() {
+    if (source()) return;
     if (cursor < 2) {
       CursorToggle();
     } else {
@@ -96,6 +113,7 @@ public:
   }
 
   void OnEncoderMove(int direction) {
+    if (source()) return;
     if (!EditMode()) {
       MoveCursor(cursor, direction, 1 + int(active_scale.num_notes));
       return;

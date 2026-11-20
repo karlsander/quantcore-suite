@@ -1,6 +1,6 @@
 # QuantCore Suite
 
-Firmware for the original four-channel µO_C with a Teensy 3.2 and the standard DAC8565 output circuit. QC01 adds a QWire leader, a fullscreen follower and six Hemisphere applets. The factory Hemisphere pair is **QC DualQ** and **QC Root**. Saved pairs take precedence.
+Firmware for the original four-channel µO_C with a Teensy 3.2 and the standard DAC8565 output circuit. QC02 includes a QWire leader, a fullscreen follower, six QuantCore utility applets and native harmony following in eight performance applets. The factory Hemisphere pair is **QC DualQ** and **QC Root**. Saved pairs take precedence.
 
 The app menu contains **Hemispheres**, **QuantCore Leader**, **QuantCore**, **Setup / About**, **Calibr8or**, **References**, **Scale Editor**, **Waveform Editor** and **Backup / Restore**. The Hemisphere bank includes the upstream T32 performance selection plus additional quantizers, logic, tuning and MIDI utilities.
 
@@ -10,7 +10,7 @@ The app menu contains **Hemispheres**, **QuantCore Leader**, **QuantCore**, **Se
 2. Open **QuantCore** on the second µO_C. Turn either encoder to inspect the scale, chord, recall or reception counters. Harmony and recall arrive while the leader is stopped.
 3. On the leader, turn the left encoder to **Root semitones** and the right encoder to **+2**. With fine tuning at zero, follower output **C** moves to D, approximately **+0.167 V**. The scale stays C major. Press **Up** on the leader to start quarter-note pulses on follower output **D**.
 
-QC01 implements QuantCore 1.0 over QWire. The USB port retains Phazerville MIDI and backup functions. Physical waveform timing, loaded output levels, input thresholds and interoperability with another module still need bench measurements.
+The suite implements QuantCore 1.0 over QWire. The USB port retains Phazerville MIDI and backup functions. Physical waveform timing, loaded output levels, input thresholds and interoperability with another module still need bench measurements.
 
 ## Fullscreen apps
 
@@ -22,7 +22,7 @@ The harmony editor provides enable, signed root and fine cents, four scale prese
 
 ## Hemisphere applets
 
-Either slot can run any QC applet. Both slots share one receiver. Selecting the first QC applet reserves TR3 for QWire and removes its raw data edges from ordinary Hemisphere gate and clock routing. Selecting the last QC applet out releases TR3. A new session waits for fresh records. A silent cable retains the last valid state.
+Either slot can run any QC applet. Both slots share one receiver. TR3 carries QWire whenever a QC utility, a native following mode or an active SeQuant progression containing a QC step needs it. Ordinary gate and clock routing regains TR3 when both slots stop using QWire. A new session waits for fresh records. A silent cable retains the last valid state.
 
 | Applet | First output | Second output | Control |
 | --- | --- | --- | --- |
@@ -37,20 +37,22 @@ Recall is available for inspection and CV control. Its IDs do not load or overwr
 
 The pitch adapter uses **0 V = MIDI note 60**, **1 V/octave**, a calibrated working range of **−3 to +6 V**, and O_C pitch units of 1/128 semitone. It chooses among in-range sounding notes and applies fine tuning once. Root output saturates at those working limits. For the nominal Hemisphere voltages, use unity attenuation, zero slew and standard 1 V/octave output scaling.
 
-## Existing applets to extend next
+## Follow harmony in a performance applet
 
-These are proposed native following modes. All eight applets listed below are in the QC01 Hemisphere bank.
+Double-click the Hemisphere select button for the applet you want to patch. Turn the left encoder clockwise to select its I/O settings, then scroll the right encoder past the two outputs to **Harmony**, or **Voice 1** and **Voice 2**. Press the right encoder, turn to **QC Scale** or **QC Chord**, then press again. For **SeQuant**, choose a source separately in each step’s scale field.
 
-| Priority | Applet | Proposed behavior |
-| --- | --- | --- |
-| 1 | MiniArp | Use bus ROOT for its pedal point and the full chord mask for successive arp tones. Preserve its direction and gate modes. |
-| 1 | Carpeggio | Imprint the received chord into its Cartesian pattern when the mask changes. Preserve the current traversal position. |
-| 1 | Chordnate | Output tuned ROOT on the first voice and quantize its second voice against the received chord. This also works with rootless voicings. |
-| 2 | Strum | Walk the enabled chord tones with the existing strum direction, spacing and triggers. Suppress note triggers when the selected set is empty. |
-| 2 | ProbMeloD | Center the generated melody on ROOT and constrain attacks to SCALE. An optional CHORD mode could supply a separate harmonic voice. |
-| 2 | TB-3PO | Use ROOT as the bassline reference and SCALE for note identity. Preserve accents, gate length and slides across harmony changes. |
-| 3 | TwoRings | Quantize the two Turing-derived pitch streams independently to SCALE or CHORD and keep the shift-register state. |
-| 3 | SeQuant | Offer bus SCALE and CHORD as quantizer sources, and bus ROOT for the existing root-output mode. Keep local sequence transport. |
+| Applet | What follows |
+| --- | --- |
+| MiniArp | Arpeggiates the full 24-note chord window in its existing directions. Pedal mode alternates tuned ROOT with chord tones, including rootless chords. CV1 and the octave setting move the chord window. Gate length stays local. |
+| Carpeggio | Maps the 16 Cartesian cells to chord degrees around ROOT. A changed mask refreshes the imprint at the current position. Fine and root changes preserve degree edits and shuffle order. |
+| Chordnate | A outputs tuned ROOT continuously. B quantizes CV2 to CHORD, continuously or sampled by its own trigger. ROOT can lie outside the chord. |
+| Strum | CV1 selects the starting chord tone. Its six editable intervals count enabled chord tones. Direction, spacing and step mode keep working. An empty note set suppresses pitch triggers. |
+| ProbMeloD | Each attack takes its weighted or looped melody relative to ROOT. Voice 1 can follow SCALE and voice 2 can follow SCALE or CHORD independently. |
+| TB-3PO | Anchors the bassline to ROOT and fits each new pitch to SCALE. It keeps the pattern, accents, gate lengths and slides as harmony changes. |
+| TwoRings | Each pitch output can follow SCALE or CHORD independently, including blend and pitched-trigger modes. The registers keep running. Gate and modulation outputs retain their native behavior. |
+| SeQuant | Choose **QC S** or **QC C** in any step’s scale field. Its Root output follows tuned ROOT on bus steps. The existing clock, CV addressing and progression modes still select the step. |
+
+Sources save with the on-device Hemisphere preset. The legacy 18-byte Hemisphere SysEx message carries the two applet payloads only. Older presets open in Local mode. Before the first valid harmony record, or when the leader disables harmony, the performance applets use their local behavior. SeQuant bus steps use a chromatic fallback with their saved local root. Empty CHORD falls back to SCALE. When both are empty, pitches hold and the local sequencers can keep moving.
 
 ## Build and verify
 
@@ -64,7 +66,7 @@ pio run -e quantcore_t32
 
 The Teensy Loader image is `software/.pio/build/quantcore_t32/quantcore-suite-T32-*.hex`. The other PlatformIO environments are inherited upstream configurations. The maintained GitHub workflow runs the host tests and builds the suite image.
 
-The host tests exercise byte and pitch vectors, waveform phase and baud variation, independent record corruption, and the suite transmitter connected to its receiver at the 32 kHz sample rate. They also cover start during stopped refresh, reset spacing, clock rollover, CV bypass/hold, fine tuning and selector presence. On hardware, scope output A during OLED redraws, test TR3 cold joins and measure pitch and recall outputs with a calibrated meter. QWire publication temporarily reserves the shared DAC/display SPI bus. The display resumes between transactions.
+The host tests exercise byte and pitch vectors, waveform phase and baud variation, independent record corruption, and the suite transmitter connected to its receiver at the 32 kHz sample rate. They also cover start during stopped refresh, reset spacing, clock rollover, CV bypass/hold, fine tuning and selector presence. The following tests compare the applet pitch tables against the reference quantizer for both measured CV and generated notes, and exercise source selection and preset encoding. On hardware, scope output A during OLED redraws, test TR3 cold joins and measure pitch and recall outputs with a calibrated meter. QWire publication temporarily reserves the shared DAC/display SPI bus. The display resumes between transactions.
 
 This fork uses Phazerville’s T32 hardware branch and vendors the MIT-licensed QuantCore record, quantizer and sampled receiver implementation. [Phazerville T32 baseline](https://github.com/djphazer/O_C-Phazerville/tree/4b9843251cc26b933940e5f02aca1d78c104b758) · [QuantCore 1.0 specification and reference source](https://github.com/karlsander/quantcore/tree/374beda68fe422dc53a8024464eef69a3593a019)
 

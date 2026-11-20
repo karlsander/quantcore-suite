@@ -69,6 +69,13 @@ public:
       reset = true;
     }
 
+#ifdef QUANTCORE_SUITE
+    bool wantsQWire() override {
+        for (int i = 0; i < nbScales; ++i)
+            if (scale[i] >= QC_SCALE) return true;
+        return false;
+    }
+#endif
     void Controller() {
         if (Clock(LEFT_CH)) {
             continuous[LEFT_CH] = 0; // Turn off continuous mode if there's a clock
@@ -81,10 +88,29 @@ public:
         }
 
         // Melody quantization
-        uint32_t previousPitch = currentPitch;
+        int32_t previousPitch = currentPitch;
+        bool noteTrigger = true;
         if (continuous[LEFT_CH] || EndOfADCLag(LEFT_CH)) {
             int32_t pitch = In(LEFT_CH);
-            currentPitch = HS::Quantize(quantizerId, pitch);
+#ifdef QUANTCORE_SUITE
+            bool busStep = scale[currentScaleId] >= QC_SCALE;
+            if (busStep && continuous[LEFT_CH] && pitch == lastInput &&
+                harmonyRevision != qc::harmonyRevision()) noteTrigger = false;
+            if (busStep && qc::harmony.enabled) {
+                const auto& tones = qc::notes(scale[currentScaleId] == QC_SCALE ? qc::BusScale : qc::BusChord);
+                int i = tones.nearest(pitch, true);
+                if (i >= 0) currentPitch = tones.pitch(i);
+                else {
+                    currentPitch = frame.outputs[io_offset].get_target();
+                    noteTrigger = false;
+                }
+            } else
+#endif
+                currentPitch = HS::Quantize(quantizerId, pitch);
+#ifdef QUANTCORE_SUITE
+            lastInput = pitch;
+            harmonyRevision = qc::harmonyRevision();
+#endif
             Out(LEFT_CH, currentPitch);
         }
 
@@ -96,7 +122,7 @@ public:
           currentScaleId = constrain(SemitoneIn(RIGHT_CH) / 3, 0, nbScales - 1);
 
           HS::SetRootNote(quantizerId, rootNote[currentScaleId]);
-          HS::QuantizerConfigure(quantizerId, scale[currentScaleId]);
+          HS::QuantizerConfigure(quantizerId, localScale());
         } else if (EndOfADCLag(RIGHT_CH)) {
           switch (currentTr2ModeId) {
             case TR2Mode::STEP_FOWARDS: {
@@ -160,13 +186,13 @@ public:
           }
 
           HS::SetRootNote(quantizerId, rootNote[currentScaleId]);
-          HS::QuantizerConfigure(quantizerId, scale[currentScaleId]);
+          HS::QuantizerConfigure(quantizerId, localScale());
         }
 
         // OUT2
         switch (currentOut2ModeId) {
           case Out2Mode::NOTE_TRIGGER:
-            if (currentPitch != previousPitch)
+            if (noteTrigger && currentPitch != previousPitch)
               ClockOut(RIGHT_CH);
             break;
           case Out2Mode::SCALE_TRIGGER:
@@ -179,7 +205,11 @@ public:
               ClockOut(RIGHT_CH);
             break;
           case Out2Mode::ROOT:
-            Out(RIGHT_CH, HS::QuantizerLookup(quantizerId, 64));
+#ifdef QUANTCORE_SUITE
+            if (scale[currentScaleId] >= QC_SCALE && qc::harmony.enabled) Out(RIGHT_CH, qc::rootCV());
+            else
+#endif
+                Out(RIGHT_CH, HS::QuantizerLookup(quantizerId, 64));
             break;
         }
 
@@ -223,7 +253,7 @@ public:
     }
 
     int NudgeScaleLocal(int scale, int dir) {
-      const int max = OC::Scales::NUM_SCALES;
+      const int max = SCALE_COUNT;
       scale += dir;
       if (scale >= max) scale = 0;
       if (scale < 0) scale = max - 1;
@@ -239,6 +269,7 @@ public:
         if(cursor == 0){
             nbScales += direction;
             CONSTRAIN(nbScales, MIN_NB_SCALES, MAX_NB_SCALES);
+            currentScaleId = min(currentScaleId, nbScales - 1);
         }else if(cursor <= nbScales * 2){
             // cursor relative to the scale section of the UI
             // I.e. 0 for the forst scale to n-1 for the n-th scale
@@ -297,7 +328,11 @@ public:
             }
             for (size_t i = 0; i < MAX_NB_SCALES; i++)
             {
-                Pack(data, PackLocation {16 + i * 8, 8}, scale[i]);
+                int saved = scale[i];
+#ifdef QUANTCORE_SUITE
+                if (saved >= QC_SCALE) saved = 254 + (saved - QC_SCALE);
+#endif
+                Pack(data, PackLocation {16 + i * 8, 8}, saved);
             }
             Pack(data, PackLocation {48, 1}, continuous[LEFT_CH]);
             Pack(data, PackLocation {49, 1}, continuous[RIGHT_CH]);
@@ -322,7 +357,12 @@ public:
             for (size_t i = 0; i < MAX_NB_SCALES; i++)
             {
                 scale[i] = Unpack(data, PackLocation {16 + i * 8, 8});
-                CONSTRAIN(scale[i], 0, OC::Scales::NUM_SCALES);
+#ifdef QUANTCORE_SUITE
+                if (scale[i] == 254) scale[i] = QC_SCALE;
+                else if (scale[i] == 255) scale[i] = QC_CHORD;
+                else
+#endif
+                    CONSTRAIN(scale[i], 0, OC::Scales::NUM_SCALES - 1);
             }
 
             // remark: no need to constrain booleans over 1 bit
@@ -338,6 +378,7 @@ public:
              // nbScales is 1-4, encoded as 0-3
             nbScales = Unpack(data, PackLocation {57, 2}) + 1;
             CONSTRAIN(nbScales, MIN_NB_SCALES, MAX_NB_SCALES);
+            currentScaleId = min(currentScaleId, nbScales - 1);
 
             quantizerId = Unpack(data, PackLocation {59, 3});
             CONSTRAIN(quantizerId, 0, QUANT_CHANNEL_COUNT - 1);
@@ -450,7 +491,19 @@ private:
     int currentScaleId = 0;
 
     // Previous pitch, used tosend a trigger when the pitch changes
-    uint32_t currentPitch = -1;
+#ifdef QUANTCORE_SUITE
+    enum { QC_SCALE = OC::Scales::NUM_SCALES, QC_CHORD, SCALE_COUNT };
+    static_assert(QC_CHORD <= 255, "SeQuant scale ID must fit one byte");
+    int lastInput = 0;
+    uint32_t harmonyRevision = 0;
+#else
+    enum { SCALE_COUNT = OC::Scales::NUM_SCALES };
+#endif
+    int localScale() const {
+        int id = scale[currentScaleId];
+        return id < OC::Scales::NUM_SCALES ? id : OC::Scales::SCALE_SEMI;
+    }
+    int32_t currentPitch = -1;
     int previousRoot = -1;
     int previousScale = -1;
 
@@ -507,10 +560,20 @@ private:
             }
 
             // Root
-            gfxPrint(posX + 15, y, OC::Strings::note_names_unpadded[rootNote[i]]);
+            int root = rootNote[i];
+#ifdef QUANTCORE_SUITE
+            if (scale[i] >= QC_SCALE && qc::harmony.enabled && !(EditMode() && widgetCursor == i * 2))
+                root = ((qc::harmony.root % 12) + 12) % 12;
+#endif
+            gfxPrint(posX + 15, y, OC::Strings::note_names_unpadded[root]);
 
             // Scale
-            gfxPrint(posX + 31, y, OC::scale_names_short[scale[i]]);
+#ifdef QUANTCORE_SUITE
+            if (scale[i] == QC_SCALE) gfxPrint(posX + 31, y, "QC S");
+            else if (scale[i] == QC_CHORD) gfxPrint(posX + 31, y, "QC C");
+            else
+#endif
+                gfxPrint(posX + 31, y, OC::scale_names_short[scale[i]]);
         }
 
         // Cursor for the roots and scales

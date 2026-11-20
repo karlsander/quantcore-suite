@@ -61,7 +61,7 @@ namespace miniarp {
     };
 }
 
-class MiniArp : public HemisphereApplet {
+class MiniArp : public HarmonyApplet<qc::ChordOnly> {
 public:
 
     enum MiniArpCursor {
@@ -100,14 +100,26 @@ public:
         eff_chord = constrain((int)chord + cv_chord_off, 0, miniarp::kNumChords - 1);
 
         // Root: 1V/oct semitones, SemitoneIn has built-in hysteresis
-        eff_root = constrain((int)root + SemitoneIn(0), 0, 127);
+        const int transpose = SemitoneIn(0);
+        eff_root = constrain((int)root + transpose, 0, 127);
 
         if (Clock(0)) {
             const miniarp::ChordDef& cd = miniarp::kChords[eff_chord];
-            const uint8_t N = cd.n_notes;
+            const int N = cd.n_notes;
             const int base_oct = (oct_shift < 0) ? oct_shift : 0;
             const int total_oct = (oct_shift < 0 ? -oct_shift : oct_shift) + 1;
-            const int M = N * total_oct;
+            int M = N * total_oct;
+            int first = 0;
+            const bool follow = source() == qc::BusChord;
+            const auto* tones = follow ? &qc::notes(qc::BusChord) : nullptr;
+            if (follow) {
+                if (!tones->count) { ++step; return; }
+                int start = 60 + qc::harmony.root + transpose + base_oct * 12;
+                int span = (qc::harmony.chord[0] | qc::harmony.chord[1] | qc::harmony.chord[2]) ? 24 : 96;
+                first = tones->firstAt(start);
+                M = tones->firstAt(start + span + 12 * (total_oct - 1)) - first;
+                if (!M) { first = tones->nearest((start - 60) * 128, false); M = 1; }
+            }
             cur_total = M;
 
             int idx;
@@ -127,6 +139,7 @@ public:
                     break;
                 }
                 case 4: {                                           // pd — Pedal Point
+                    if (follow) { idx = (step / 2) % M; break; }
                     if (M <= 1) { idx = 0; break; }
                     idx = (step & 1)
                         ? (1 + ((step >> 1) % (M - 1)))
@@ -149,12 +162,20 @@ public:
             }
             cur_idx = idx;
 
-            const int semi = cd.tones[idx % N] + 12 * ((idx / N) + base_oct);
-            const int raw_midi = eff_root + semi;
-            last_clip = (raw_midi > 127) ? 1 : (raw_midi < 0 ? -1 : 0);
-            const int midi = constrain(raw_midi, 0, 127);
-            last_midi = midi;
-            Out(0, MIDIQuantizer::CV((uint8_t)midi));
+            if (follow) {
+                bool pedal = mode == 4 && !(step & 1);
+                int cv = pedal ? qc::rootCV() : tones->pitch(first + idx);
+                Out(0, cv);
+                last_midi = constrain(pedal ? 60 + qc::harmony.root : int(tones->midi[first + idx]), 0, 127);
+                last_clip = 0;
+            } else {
+                const int semi = cd.tones[idx % N] + 12 * ((idx / N) + base_oct);
+                const int raw_midi = eff_root + semi;
+                last_clip = (raw_midi > 127) ? 1 : (raw_midi < 0 ? -1 : 0);
+                const int midi = constrain(raw_midi, 0, 127);
+                last_midi = midi;
+                Out(0, MIDIQuantizer::CV((uint8_t)midi));
+            }
 
             const uint32_t period_ticks = ClockCycleTicks(0);
             uint32_t gate_ticks = period_ticks * gate_pct / 100;
@@ -175,13 +196,13 @@ public:
         const uint8_t show_chord = editing_chord ? chord : eff_chord;
 
         // Row 1: Root (note-name) + CV mod indicator
-        gfxPrint(1, 15, midi_note_numbers[show_root]);
+        gfxPrint(1, 15, source() && !editing_root ? midi_note_numbers[constrain(60 + qc::harmony.root, 0, 127)] : midi_note_numbers[show_root]);
         if (eff_root != root) gfxIcon(54, 15, CV_ICON);
         if (cursor == ROOT) gfxCursor(0, 23, 27, 9, "Root");
 
         // Row 2: Chord name + CV mod indicator
-        gfxPrint(1, 26, miniarp::kChords[show_chord].name);
-        if (eff_chord != chord) gfxIcon(54, 26, CV_ICON);
+        gfxPrint(1, 26, source() && !editing_chord ? "QC Chord" : miniarp::kChords[show_chord].name);
+        if (!source() && eff_chord != chord) gfxIcon(54, 26, CV_ICON);
         if (cursor == CHORD) gfxCursor(0, 34, 33, 9, "Chord");
 
         // Row 3: Mode (2ch) + Octave (2ch) + gate icon + gate%
@@ -208,8 +229,8 @@ public:
         else if (last_clip < 0) gfxIcon(25, 54, DOWN_ICON);
 
         {
-            const int digits_idx = (cur_idx + 1 < 10) ? 1 : 2;
-            const int digits_tot = (cur_total < 10) ? 1 : 2;
+            const int digits_idx = (cur_idx + 1 < 10) ? 1 : cur_idx + 1 < 100 ? 2 : 3;
+            const int digits_tot = (cur_total < 10) ? 1 : cur_total < 100 ? 2 : 3;
             const int width = (digits_idx + 1 + digits_tot) * 6; // N/M
             const int right = 61;
             const int x = right - width;

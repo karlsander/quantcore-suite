@@ -36,7 +36,7 @@
 #endif
 #define ACID_MAX_STEPS 32
 
-class TB_3PO: public HemisphereApplet {
+class TB_3PO: public HarmonyApplet<qc::ScaleOnly> {
   public:
 
     enum TB3POCursor {
@@ -111,7 +111,23 @@ class TB_3PO: public HemisphereApplet {
         step = get_next_step(step);
       }
 
-      if (step_is_slid(step_pv)) {
+      int target = get_pitch_for_step(step);
+      bool playable = true;
+      if (source()) {
+        const auto& tones = qc::notes(qc::BusScale);
+        int nominal = qc::harmony.root * 128 + target - HS::QuantizerLookup(qselect, 64);
+        int i = tones.nearest(nominal, false);
+        playable = i >= 0;
+        if (playable) {
+          target = tones.pitch(i);
+          curr_step_semitone = tones.midi[i] % 12;
+        }
+      }
+      if (!playable) {
+        curr_gate_cv = 0;
+        gate_off_tick = 0;
+        slide_end_cv = curr_pitch_cv;
+      } else if (step_is_slid(step_pv)) {
         // Glide from previous step pitch
         //slide_start_cv = get_pitch_for_step(step_pv);
         //curr_pitch_cv = slide_start_cv;
@@ -119,15 +135,15 @@ class TB_3PO: public HemisphereApplet {
         // Start glide from whereever we are
         slide_start_cv = curr_pitch_cv;
 
-        slide_end_cv = get_pitch_for_step(step);
+        slide_end_cv = target;
       } else if (!hold_pitch || step_is_gated(step)) {
         // No glide but new pitch
-        curr_pitch_cv = get_pitch_for_step(step);
+        curr_pitch_cv = target;
         slide_start_cv = curr_pitch_cv;
         slide_end_cv = curr_pitch_cv;
       }
 
-      if (step_is_gated(step) || step_is_slid(step_pv)) {
+      if (playable && (step_is_gated(step) || step_is_slid(step_pv))) {
         // 3V or 6V for accent
         curr_gate_cv = (1 + step_is_accent(step)) * HEMISPHERE_3V_CV;
 
@@ -135,7 +151,7 @@ class TB_3PO: public HemisphereApplet {
         gate_off_tick = this_tick + gate_time;
       }
 
-      curr_step_semitone = get_semitone_for_step(step);
+      if (!source()) curr_step_semitone = get_semitone_for_step(step);
       reset_flag = 0;
     }
 
@@ -154,8 +170,13 @@ class TB_3PO: public HemisphereApplet {
 
       int x = slide_end_cv;
       x -= curr_pitch_cv;
-      x >>= 18;
-      x *= k;
+      if (source()) {
+        // These values are Q7 CV. Keep a nonzero final increment in either direction.
+        x = x > 0 ? max(1, x / 128) : min(-1, x / 128);
+      } else {
+        x >>= 18;
+        x *= k;
+      }
       curr_pitch_cv += x;
 
       // TODO: Check constrain, set a bit if constrain was needed

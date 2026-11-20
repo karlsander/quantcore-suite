@@ -46,6 +46,7 @@
 #include "HSIOFrame.h"
 #include <cstdint>
 #include <variant>
+#include "quantcore/follow.h"
 
 #define APPLET_INTERFACE(clazz, name, icon) \
 protected: \
@@ -103,6 +104,10 @@ public:
       return OC::Strings::capital_letters[ch + io_offset];
     }
 
+#ifdef QUANTCORE_SUITE
+    virtual qc::Routes* harmonyRoutes() { return nullptr; }
+    virtual bool wantsQWire() { return false; }
+#endif
     virtual void Start() = 0;
     virtual void Reset() { };
     virtual void Controller() = 0;
@@ -694,6 +699,23 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
+};
+
+template<qc::Options First, qc::Options Second = qc::NoSource>
+class HarmonyApplet : public HemisphereApplet {
+#ifdef QUANTCORE_SUITE
+  qc::Routes routes{{First, Second}};
+ public:
+  qc::Routes* harmonyRoutes() override { return &routes; }
+  bool wantsQWire() override { return routes.wanted(); }
+ protected:
+  qc::Source source(int lane = 0) const {
+    return qc::harmony.enabled ? routes.source[lane] : qc::Local;
+  }
+#else
+ protected:
+  constexpr qc::Source source(int = 0) const { return qc::Local; }
+#endif
 };
 
 #endif // _HEM_APPLET_H_
