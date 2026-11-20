@@ -27,6 +27,9 @@
 #include <EEPROM.h>
 
 #include "OC_core.h"
+#ifdef QUANTCORE_SUITE
+#include "quantcore/module.h"
+#endif
 #include "OC_apps.h"
 #include "OC_DAC.h"
 #include "OC_debug.h"
@@ -74,9 +77,19 @@ void FASTRUN CORE_timer_ISR() {
   // a DMA transfer to the display things are fairly nicely interleaved. In the
   // next ISR, the display transfer is finalized (CS update).
 
+#ifdef QUANTCORE_SUITE
+  if (!qc::sending()) {
+    display::Flush();
+    if (!qc::ownsSPI()) {
+      OC::DAC::Update();
+      display::Update();
+    }
+  }
+#else
   display::Flush();
   OC::DAC::Update();
   display::Update();
+#endif
 
   // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
   OC::ADC::Scan_DMA();

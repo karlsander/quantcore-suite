@@ -1,83 +1,72 @@
-[![PlatformIO CI](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-Phazerville/actions/workflows/firmware.yml)
+# QuantCore Suite
 
-Phazerville Suite - an active o_C firmware fork
-===
-[![SynthDad is pretty cool ;P](http://img.youtube.com/vi/kT94mBjvVQI/0.jpg)](http://www.youtube.com/watch?v=kT94mBjvVQI "Ornament and Crime Teensy 4.1 with Phazerville. What's New and Improved?")
+Firmware for the original four-channel µO_C with a Teensy 3.2 and the standard DAC8565 output circuit. QC01 adds a QWire leader, a fullscreen follower and six Hemisphere applets. The factory Hemisphere pair is **QC DualQ** and **QC Root**. Saved pairs take precedence.
 
-<details><summary>More Videos...</summary>
+The app menu contains **Hemispheres**, **QuantCore Leader**, **QuantCore**, **Setup / About**, **Calibr8or**, **References**, **Scale Editor**, **Waveform Editor** and **Backup / Restore**. The Hemisphere bank includes the upstream T32 performance selection plus additional quantizers, logic, tuning and MIDI utilities.
 
-  [![Firmware Update v1.10](http://img.youtube.com/vi/UvlA5_C1aig/0.jpg)](http://www.youtube.com/watch?v=UvlA5_C1aig "Phazerville Suite v1.10 - O_C Firmware Update")
-  [![SynthDad's v1.7 update](http://img.youtube.com/vi/bziSog_xscA/0.jpg)](http://www.youtube.com/watch?v=bziSog_xscA "Ornament and Crime Phazerville 1.7: What's new in this big release!")
-  [![SynthDad's video overview](http://img.youtube.com/vi/XRGlAmz3AKM/0.jpg)](http://www.youtube.com/watch?v=XRGlAmz3AKM "Phazerville; newest firmware for Ornament and Crime. Tutorial and patch ideas")
-  [![Pigeons, Polyrhythms, Music & Math](http://img.youtube.com/vi/J1OH-oomvMA/0.jpg)](http://www.youtube.com/watch?v=J1OH-oomvMA "Pigeons & Polyrhythms / Music & Math")
-  [![DualTM & O_C T4.1 Hardware](http://img.youtube.com/vi/51cchuLNIDU/0.jpg)](http://www.youtube.com/watch?v=51cchuLNIDU "Next-gen O_C T4.1 Hardware + DualTM applet")
-</details>
+## Patch two modules
 
-Watch some **video overviews** (above) or check the [**project website**](https://firmware.phazerville.com) for more info.
+1. Open **QuantCore Leader** on the first µO_C. Patch **output A** to **TR3** on the second. QWire uses the ordinary panel jacks. Output A targets calibrated 0 V and 3.3 V.
+2. Open **QuantCore** on the second µO_C. Turn either encoder to inspect the scale, chord, recall or reception counters. Harmony and recall arrive while the leader is stopped.
+3. On the leader, turn the left encoder to **Root semitones** and the right encoder to **+2**. With fine tuning at zero, follower output **C** moves to D, approximately **+0.167 V**. The scale stays C major. Press **Up** on the leader to start quarter-note pulses on follower output **D**.
 
-[Download a firmware **Release**](https://github.com/djphazer/O_C-Phazerville/releases) or [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) (for Teensy 3.2).
+QC01 implements QuantCore 1.0 over QWire. The USB port retains Phazerville MIDI and backup functions. Physical waveform timing, loaded output levels, input thresholds and interoperability with another module still need bench measurements.
 
-Grab Paul's [**Screen Capture**](https://github.com/PaulStoffregen/Phazerville-Screen-Capture) program to view the screen on a PC via USB.
+## Fullscreen apps
 
-## Hardware Info
-There are two distinct _microcontrollers_ aka MCU's (and each has variants) and also two distinct hardware _shields_, and there's some overlap.
+**QuantCore Leader** starts stopped at the saved tempo, initially 120 BPM. Turn the left encoder to choose a field and the right encoder to edit. **Up** toggles playback at 20–300 BPM. Each start sends a reset-marked first quarter. While stopped, the leader publishes both complete records every 200 ms. A start requested during a publication waits for its final stop bit, 25 ms of quiet and legal beat spacing before sending the 7 ms prefix.
 
-### Shields:
-* **o_C** - based on the original "ornament & crime" hardware design by **mxmxmx**
-  - 4ch ADC / 4ch DAC
-  - DAC and OLED share a SPI bus
-  - 8HP uO_c by jakplugg - https://github.com/jakplugg/uO_c
-  - original 14HP panels & gerbers are in the `hardware` directory
-* **O.R.N.8** aka "O_C T4.1" - https://github.com/PaulStoffregen/O_C_T41
-  - 8ch ADC / 8ch DAC / 2ch Audio In + 2ch Audio Out
-  - SPI0 dedicated for DAC
-  - SPI1 dedicated for OLED
-  - Serial MIDI In + Out / USB Host MIDI
-  - designed by Paul, derived from original
+The harmony editor provides enable, signed root and fine cents, four scale presets, all 96 scale bits and all 24 chord bits. On a bit field, turn the right encoder to select the bit and press it to toggle. Bit zero is MIDI note 60. Presets replace the scale across all eight octaves. The four recall fields each span **Absent**, then **0–255**. The normal app-menu save stores the edited state and tempo. Playback always starts stopped. Outputs B–D rest at zero in Leader.
 
-### MCUs:
-* Teensy 3.2 - compatible with O_C
-* Teensy 4.0 - compatible with O_C
-* Teensy 4.1 - compatible with O_C or ORN8
+**QuantCore** continuously quantizes CV1 to the scale on **A** and CV2 to the chord on **B**. **C** outputs tuned root. **D** gives a roughly 5 ms pulse per validated quarter, including the reset-marked quarter. On the mask pages, each row is one octave from C through B. Filled cells are enabled. The diagnostics page counts accepted records, sampling gaps and discarded bursts. Prefixes and markers can produce expected discarded bursts.
 
-Thus, the 4.x series are pin-compatible drop-in replacements for the old existing O_C hardware. They bring increased CPU, RAM, and Flash capacity, while working with the existing limitations of the design (sharing a SPI bus). Although the 4.1 can technically work with O_C (using the T40 firmware), the form factor of the 4.0 is more fitting, especially on the 8HP model.
+## Hemisphere applets
 
-The T41 firmware builds primarily target the new O.R.N.8 hardware shield, with new features that take advantage of it (lots of Audio DSP stuff), but many CV and MIDI features will still show up in the T40 builds for old hardware. T32 support is deprecated, but will remain available for Custom Builds, receiving occasional Applet updates.
+Either slot can run any QC applet. Both slots share one receiver. Selecting the first QC applet reserves TR3 for QWire and removes its raw data edges from ordinary Hemisphere gate and clock routing. Selecting the last QC applet out releases TR3. A new session waits for fresh records. A silent cable retains the last valid state.
 
-## Stolen Ornaments
+| Applet | First output | Second output | Control |
+| --- | --- | --- | --- |
+| QC DualQ | Quantized CV1 | Quantized CV2 | Press to select channel, turn for Scale, Chord or Both (intersection) |
+| QC Root | Root pitch including fine tuning | Fine tuning alone as a pitch offset | Direct continuous outputs |
+| QC Recall | Selected ID scaled linearly from 0–255 to 0–5 V | Presence gate | Turn for project, program, pattern or snapshot. Present ID zero raises the gate at 0 V on the first output |
+| QC Clock | Quarter pulse | Reset pulse on a reset-marked quarter | Both pulse together on a restart |
+| QC Mask | Selected scale bit as a gate | Corresponding chord bit as a gate | Turn through bits 0–95. The chord index repeats every 24 positions |
+| QC State | Harmony enabled gate | Valid recall acquired gate | Display distinguishes waiting, enabled and explicitly disabled harmony |
 
-Using [**Benisphere**](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this project takes the **Hemisphere** ecosystem in new directions, with many new applets and enhancements to existing ones. An effort has been made to collect all the bleeding-edge features from other developers, with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible!
+Recall is available for inspection and CV control. Its IDs do not load or overwrite Hemisphere presets. The two masks retain their full 96- and 24-semitone periods. An empty chord makes Chord and Both use the scale. Enabled harmony with no in-range candidate holds the last CV. Disabled or unacquired harmony passes the measured CV through. Root and fine outputs return to zero while harmony is disabled.
 
-I've also included **all of the stock O&C firmware apps** plus a few others, _but they don't all fit in one .hex_. As a courtesy, I provide **pre-built .hex files** with a selection of Apps in my [**Releases**](https://github.com/djphazer/O_C-Phazerville/releases). You can also tell a robot to make a [**Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) for you... (T3.2 only)
+The pitch adapter uses **0 V = MIDI note 60**, **1 V/octave**, a calibrated working range of **−3 to +6 V**, and O_C pitch units of 1/128 semitone. It chooses among in-range sounding notes and applies fine tuning once. Root output saturates at those working limits. For the nominal Hemisphere voltages, use unity attenuation, zero slew and standard 1 V/octave output scaling.
 
-...or clone the repo, customize the `platformio.ini` file, and build it yourself! ;-)
-I think the beauty of this module is the fact that it's relatively easy to modify and build the source code to reprogram it. You are free to customize the firmware to work in your system, similar to how you've no doubt already selected a custom set of physical modules.
+## Existing applets to extend next
 
-## How To Hack It
+These are proposed native following modes. All eight applets listed below are in the QC01 Hemisphere bank.
 
-### Option 1: Platform IO
-This firmware fork is primarily built using Platform IO, a Python-based build toolchain, available as either a [standalone CLI](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html) or a [full-featured IDE](https://platformio.org/install/ide), as well as a plugin for VSCode and other existing IDEs. Follow one of those links to get that set up first.
+| Priority | Applet | Proposed behavior |
+| --- | --- | --- |
+| 1 | MiniArp | Use bus ROOT for its pedal point and the full chord mask for successive arp tones. Preserve its direction and gate modes. |
+| 1 | Carpeggio | Imprint the received chord into its Cartesian pattern when the mask changes. Preserve the current traversal position. |
+| 1 | Chordnate | Output tuned ROOT on the first voice and quantize its second voice against the received chord. This also works with rootless voicings. |
+| 2 | Strum | Walk the enabled chord tones with the existing strum direction, spacing and triggers. Suppress note triggers when the selected set is empty. |
+| 2 | ProbMeloD | Center the generated melody on ROOT and constrain attacks to SCALE. An optional CHORD mode could supply a separate harmonic voice. |
+| 2 | TB-3PO | Use ROOT as the bassline reference and SCALE for note identity. Preserve accents, gate length and slides across harmony changes. |
+| 3 | TwoRings | Quantize the two Turing-derived pitch streams independently to SCALE or CHORD and keep the shift-register state. |
+| 3 | SeQuant | Offer bus SCALE and CHORD as quantizer sources, and bus ROOT for the existing root-output mode. Keep local sequence transport. |
 
-The PlatformIO project for the source code lives within the `software/` directory. From there, you can Build the desired configuration and Upload via USB to your module. In the terminal, I type:
+## Build and verify
+
+From the repository root with PlatformIO installed, run the host tests and build the default original-µO_C target.
+
+```sh
+software/test/quantcore/run.sh
+cd software
+pio run -e quantcore_t32
 ```
-pio run -e T41 -t upload
-```
-Or, for older Teensy 3.2 modules:
-```
-pio run -e T32 -t upload
-```
-Or use `T40` for Teensy 4.0. Have a look inside `platformio.ini` for alternative build environment configurations and app flags.
 
-_**Pro-tip**_: If you decide to fork the project, and enable GitHub Actions on your own repo, GitHub will build the files for you... ;)
+The Teensy Loader image is `software/.pio/build/quantcore_t32/quantcore-suite-T32-*.hex`. The other PlatformIO environments are inherited upstream configurations. The maintained GitHub workflow runs the host tests and builds the suite image.
 
-### Option 2: Arduino IDE
-Instead of Platform IO, you can use the latest version of the Arduino IDE + Teensyduino extension. The newer 2.x series should work, no need to install an old version.
+The host tests exercise byte and pitch vectors, waveform phase and baud variation, independent record corruption, and the suite transmitter connected to its receiver at the 32 kHz sample rate. They also cover start during stopped refresh, reset spacing, clock rollover, CV bypass/hold, fine tuning and selector presence. On hardware, scope output A during OLED redraws, test TR3 cold joins and measure pitch and recall outputs with a calibrated meter. QWire publication temporarily reserves the shared DAC/display SPI bus. The display resumes between transactions.
 
-Simply open the `software/src/src.ino` file. In the Tools menu, select the appropriate Teensy Board for your hardware; use the "Optimize -> Smallest Code" and "USB Type -> MIDI" options.
-
-Customize Apps and other flags inside `software/src/OC_options.h`. You can also disable individual applets in `software/src/hemisphere_config.h`.
-
-For Teensy 4.1, you'll need a copy of my forked playback library in your local sketchbook folder. Inside the `Arduino/libararies` directory: `git clone https://github.com/djphazer/teensy-variable-playback.git`
+This fork uses Phazerville’s T32 hardware branch and vendors the MIT-licensed QuantCore record, quantizer and sampled receiver implementation. [Phazerville T32 baseline](https://github.com/djphazer/O_C-Phazerville/tree/4b9843251cc26b933940e5f02aca1d78c104b758) · [QuantCore 1.0 specification and reference source](https://github.com/karlsander/quantcore/tree/374beda68fe422dc53a8024464eef69a3593a019)
 
 ## Credits
 

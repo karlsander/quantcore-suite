@@ -258,9 +258,26 @@ public:
         zoom_slot = -1;
         clock_setup = 0;
 
+#ifdef QUANTCORE_SUITE
+        SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(101)); // QC DualQ
+        SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(102)); // QC Root
+#else
         SetApplet(LEFT_HEMISPHERE, HS::get_applet_index_by_id(18)); // DualTM
         SetApplet(RIGHT_HEMISPHERE, HS::get_applet_index_by_id(15)); // EuclidX
+#endif
     }
+
+#ifdef QUANTCORE_SUITE
+    void ReceiveQuantCore() {
+        bool wanted = false;
+        for (int index : my_applet) {
+            if (index < 0) continue;
+            int id = HS::available_applets[index].id;
+            wanted |= id >= 101 && id <= 106;
+        }
+        qc::receive(wanted);
+    }
+#endif
 
     void Resume() {
         if (!hem_active_preset)
@@ -1402,6 +1419,9 @@ static size_t HEMISPHERE_restore(const void *storage) {
 }
 
 void FASTRUN HEMISPHERE_isr() {
+#ifdef QUANTCORE_SUITE
+    manager.ReceiveQuantCore();
+#endif
     manager.BaseController();
 }
 

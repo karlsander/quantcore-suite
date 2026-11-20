@@ -35,6 +35,14 @@ public:
   static void Init();
   static void reInit() { Init(); }
   static void Scan();
+#ifdef QUANTCORE_SUITE
+  inline static volatile bool qwire_reserved;
+  static void reserve_qwire(bool enabled) {
+    qwire_reserved = enabled;
+    clocked_[DIGITAL_INPUT_3] = 0;
+    clocked_mask_ &= ~DIGITAL_INPUT_3_MASK;
+  }
+#endif
 
   // @return mask of all pins cloked since last call (does not reset state)
   static inline uint32_t clocked() {
@@ -52,10 +60,16 @@ public:
   }
 
   template <DigitalInput input> static inline bool read_immediate() {
+#ifdef QUANTCORE_SUITE
+    if (input == DIGITAL_INPUT_3 && qwire_reserved) return false;
+#endif
     return !digitalReadFast(InputPinMap(input));
   }
 
   static inline bool read_immediate(DigitalInput input) {
+#ifdef QUANTCORE_SUITE
+    if (input == DIGITAL_INPUT_3 && qwire_reserved) return false;
+#endif
     return !digitalReadFast(InputPinMap(input));
   }
 

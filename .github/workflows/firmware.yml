@@ -1,4 +1,4 @@
-name: PlatformIO CI
+name: QuantCore Suite
 
 on:
   push:
@@ -33,6 +33,9 @@ jobs:
         pip3 install --upgrade pip
         pip3 install -r .github/workflows/requirements.txt
 
+    - name: Test QuantCore protocol and QWire loopback
+      run: software/test/quantcore/run.sh
+
     - name: Build firmware
       working-directory: software/
       run: |
@@ -41,5 +44,5 @@ jobs:
     - name: Copy artifact
       uses: actions/upload-artifact@v7
       with:
-        name: o_C-${{env.OC_ARTIFACT_TAG}}
+        name: quantcore-suite-T32-${{env.OC_ARTIFACT_TAG}}
         path: software/.pio/build/*/*.hex
