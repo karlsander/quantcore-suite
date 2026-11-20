@@ -289,7 +289,11 @@ UiMode Ui::Splashscreen(bool &reset_settings) {
     graphics.setPrintPos(28, 23);
     graphics.print(" Welcome to");
     graphics.setPrintPos(28, 33);
+#ifdef QUANTCORE_SUITE
+    graphics.print(" QuantCore");
+#else
     graphics.print("Phazerville!");
+#endif
     //graphics.print(OC::Strings::RELEASE_NAME);
 
     while (event_queue_.available())

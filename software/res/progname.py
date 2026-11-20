@@ -36,4 +36,5 @@ if "VOR" in defines:
 if "FLIP_180" in defines:
     extras += "_flipped"
 
-env.Replace(PROGNAME=f"o_C-phazerville-{version}{extras}-{git_rev}")
+product = "quantcore-suite-T32" if "QUANTCORE_SUITE" in defines else "o_C-phazerville"
+env.Replace(PROGNAME=f"{product}-{version}{extras}-{git_rev}")

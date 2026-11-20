@@ -19,6 +19,9 @@ void FASTRUN OC::tr2_ISR() {
 }
 
 void FASTRUN OC::tr3_ISR() {
+#ifdef QUANTCORE_SUITE
+  if (OC::DigitalInputs::qwire_reserved) return;
+#endif
   OC::DigitalInputs::clock<OC::DIGITAL_INPUT_3>();
 }
 

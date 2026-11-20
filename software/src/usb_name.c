@@ -7,8 +7,13 @@
 // Edit these lines to create your own name.  The length must
 // match the number of characters in your custom name.
 
+#ifdef QUANTCORE_SUITE
+#define MIDI_NAME {'Q','u','a','n','t','C','o','r','e',' ','S','u','i','t','e'}
+#define MIDI_NAME_LEN 15
+#else
 #define MIDI_NAME {'P','e','w','P','e','w','M','I','D','I'}
 #define MIDI_NAME_LEN 10
+#endif
 
 // Do not change this part.  This exact format is required by USB.
 

@@ -72,6 +72,9 @@ namespace menu = OC::menu;
 #include "APP_PONGGAME.h"
 #include "APP_Backup.h"
 #include "APP_SETTINGS.h"
+#ifdef QUANTCORE_SUITE
+#include "APP_QuantCore.h"
+#endif
 
 #define DECLARE_APP(a, b, name, prefix) \
 { TWOCC<a,b>::value, name, \
@@ -94,6 +97,10 @@ static constexpr OC::App available_apps[] = {
   DECLARE_APP('H','S', "Hemispheres", HEMISPHERE),
 #endif
 
+#ifdef QUANTCORE_SUITE
+  DECLARE_APP('Q','L', "QuantCore Leader", QCLeader),
+  DECLARE_APP('Q','F', "QuantCore", QCFollower),
+#endif
   #ifdef ENABLE_APP_CALIBR8OR
   DECLARE_APP('C','8', "Calibr8or", Calibr8or),
   #endif
@@ -377,6 +384,9 @@ namespace apps {
 
 FLASHMEM
 void set_current_app(int index) {
+#ifdef QUANTCORE_SUITE
+  qc::leaveApp();
+#endif
   current_app = &available_apps[index];
   global_settings.current_app_id = current_app->id;
   #ifdef VOR

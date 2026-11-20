@@ -17,7 +17,11 @@ namespace OC {
 #endif
 
   // 17 char width                  |                 |
+#ifdef QUANTCORE_SUITE
+  const char * const RELEASE_NAME = "QuantCore Suite";
+#else
   const char * const RELEASE_NAME = "Phazerville Suite";
+#endif
   // TODO: array of alternate titles, one for every letter of the alphabet
 
 #if defined(VOR)

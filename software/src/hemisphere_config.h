@@ -142,6 +142,10 @@ private:
   }
 };
 
+#ifdef QUANTCORE_SUITE
+#include "applets/QuantCore.h"
+#endif
+
 AppletRegistry reg{
     // universal test applet :)
     DeclareApplet<Ponglet>{99, 0x00},
@@ -150,7 +154,7 @@ AppletRegistry reg{
    * So pick a bundle or two.
    */
 
-#ifdef PEWPEWPEW
+#if defined(PEWPEWPEW) || defined(QUANTCORE_SUITE)
     // Phazer's choice
     DeclareApplet<BugCrack>{51, 0x80},
     DeclareApplet<DrLoFi>{16, 0x80},
@@ -308,6 +312,27 @@ AppletRegistry reg{
 #endif
 
 #endif // !PEWPEWPEW
+
+#ifdef QUANTCORE_SUITE
+    DeclareApplet<QCDual>{101, 0x08},
+    DeclareApplet<QCRoot>{102, 0x08},
+    DeclareApplet<QCRecall>{103, 0x10},
+    DeclareApplet<QCClock>{104, 0x04},
+    DeclareApplet<QCMask>{105, 0x08},
+    DeclareApplet<QCState>{106, 0x10},
+    DeclareApplet<Carpeggio>{32, 0x0a},
+    DeclareApplet<Chordinator>{64, 0x08},
+    DeclareApplet<DualQuant>{9, 0x08},
+    DeclareApplet<ScaleDuet>{26, 0x08},
+    DeclareApplet<SeQuant>{86, 0x08},
+    DeclareApplet<Calibr8>{88, 0x10},
+    DeclareApplet<Tuner>{39, 0x80},
+    DeclareApplet<Compare>{30, 0x10},
+    DeclareApplet<Logic>{10, 0x44},
+    DeclareApplet<GateDelay>{29, 0x04},
+    DeclareApplet<hMIDIIn>{150, 0x20},
+    DeclareApplet<hMIDIOut>{27, 0x20},
+#endif
 
 };
 
