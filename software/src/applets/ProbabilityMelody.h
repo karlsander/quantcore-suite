@@ -66,7 +66,7 @@ static constexpr LabelledCvConfig cv_modes[] = {
 }
 
 
-class ProbabilityMelody : public HemisphereApplet {
+class ProbabilityMelody : public HarmonyApplet<qc::ScaleOnly, qc::ScaleOrChord> {
 public:
 
     enum ProbMeloCursor {
@@ -125,7 +125,13 @@ public:
                 } else {
                     pitch[ch] = GetNextWeightedPitch();
                 }
-                Out(ch, MIDIQuantizer::CV(pitch[ch] + (12*OC::DAC::kOctaveZero)));
+                if (source(ch)) {
+                    const auto& tones = qc::notes(source(ch));
+                    int i = tones.nearest((qc::harmony.root + pitch[ch]) * 128, false);
+                    if (i >= 0) Out(ch, tones.pitch(i));
+                } else {
+                    Out(ch, MIDIQuantizer::CV(pitch[ch] + (12*OC::DAC::kOctaveZero)));
+                }
             }
         }
 

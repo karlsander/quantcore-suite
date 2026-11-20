@@ -301,7 +301,7 @@ public:
         Pack(data, PackLocation{0 + i*7, 7}, HS::frame.clockinskip[i]);
         Pack(data, PackLocation{28 + i*7, 7}, HS::frame.clockoutskip[i]);
       }
-      // 8 bits free
+      // QuantCore Suite stores the two Hemisphere harmony routes in bits 56..63.
       return data;
     }
     void SetGlobals(const uint64_t &data) {

@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-class Strum : public HemisphereApplet {
+class Strum : public HarmonyApplet<qc::ChordOnly> {
 public:
   const char *applet_name() { return "Strum"; }
   const uint8_t *applet_icon() { return PhzIcons::strum; }
@@ -71,11 +71,19 @@ public:
 
     if (step_advance && countdown <= 0 && !index_out_of_bounds && inc != 0) {
       int raw_pitch = In(0);
-      HS::Quantize(qselect_mod, raw_pitch);
-      disp = HS::GetLatestNoteNumber(qselect_mod);
-      int pitch = HS::QuantizerLookup(qselect_mod, disp + intervals[index]);
-      Out(0, pitch);
-      ClockOut(1);
+      if (source()) {
+        const auto& tones = qc::notes(qc::BusChord);
+        int anchor = tones.nearest(raw_pitch, true);
+        if (anchor >= 0) {
+          Out(0, tones.shifted(anchor, intervals[index]));
+          ClockOut(1);
+        }
+      } else {
+        HS::Quantize(qselect_mod, raw_pitch);
+        disp = HS::GetLatestNoteNumber(qselect_mod);
+        Out(0, HS::QuantizerLookup(qselect_mod, disp + intervals[index]));
+        ClockOut(1);
+      }
 
       last_note_dur = 17 * spacing;
       if (!qmod)
@@ -93,9 +101,12 @@ public:
   }
 
   void View() {
-    gfxPrint(1, 15, "Q"); gfxPrint(qselect_mod + 1);
-    gfxPrint(15, 15, OC::scale_names_short[HS::GetScale(qselect_mod)]);
-    gfxPrint(45, 15, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect_mod)]);
+    if (source()) gfxPrint(1, 15, "QC Chord");
+    else {
+      gfxPrint(1, 15, "Q"); gfxPrint(qselect_mod + 1);
+      gfxPrint(15, 15, OC::scale_names_short[HS::GetScale(qselect_mod)]);
+      gfxPrint(45, 15, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect_mod)]);
+    }
     if (cursor == QUANT)
       gfxSpicyCursor(1, 23, 13);
 
@@ -116,6 +127,17 @@ public:
 
     gfxIcon(56, qmod? 15 : 25, LEFT_ICON);
 
+    if (source()) {
+      for (int i = 0; i < length; ++i) {
+        int x = (i % 3) * 21 + 1;
+        int y = 37 + (i / 3) * 14;
+        gfxPrint(x, y, intervals[i]);
+        if (cursor == INTERVAL_START + i) gfxCursor(x, y + 8, 18);
+        if (inc && index - inc == i) gfxInvert(x, y - 1, 18, 9);
+      }
+      if (cursor == LENGTH) gfxSpicyCursor(0, 61, 62);
+      return;
+    }
     int num_notes = OC::Scales::GetScale(HS::GetScale(qselect_mod)).num_notes;
     const int cursor_width = 9;
     const int col_width = cursor_width + 2;

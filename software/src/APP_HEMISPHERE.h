@@ -268,12 +268,15 @@ public:
     }
 
 #ifdef QUANTCORE_SUITE
+    qc::Routes* routesFor(int h) {
+        return HS::available_applets[my_applet[h]].instance[h]->harmonyRoutes();
+    }
     void ReceiveQuantCore() {
         bool wanted = false;
-        for (int index : my_applet) {
+        for (int h = 0; h < 2; ++h) {
+            int index = my_applet[h];
             if (index < 0) continue;
-            int id = HS::available_applets[index].id;
-            wanted |= id >= 101 && id <= 106;
+            wanted |= HS::available_applets[index].instance[h]->wantsQWire();
         }
         qc::receive(wanted);
     }
@@ -312,6 +315,10 @@ public:
         hem_active_preset->SetClockData(data);
 
         data = ClockSetup_instance.GetGlobals();
+#ifdef QUANTCORE_SUITE
+        for (int h = 0; h < 2; ++h)
+            if (auto* routes = routesFor(h)) data |= uint64_t(routes->pack()) << (56 + 4*h);
+#endif
         if (data != global_data) doSave = 1;
         global_data = data;
         hem_active_preset->SetGlobals(data);
@@ -353,6 +360,9 @@ public:
                 int index = HS::get_applet_index_by_id( hem_active_preset->GetAppletId(h) );
                 applet_data[h] = hem_active_preset->GetData(HEM_SIDE(h));
                 SetApplet(HEM_SIDE(h), index);
+#ifdef QUANTCORE_SUITE
+                if (auto* routes = routesFor(h)) routes->restore(global_data >> (56 + 4*h));
+#endif
                 HS::available_applets[index].instance[h]->OnDataReceive(applet_data[h]);
             }
         }
@@ -535,6 +545,21 @@ public:
             }
             else {
               HS::available_applets[index].instance[zoom_slot]->BaseView(true, zoom_cursor < 0);
+#ifdef QUANTCORE_SUITE
+              if (auto* routes = routesFor(zoom_slot); routes && zoom_cursor >= 7) {
+                graphics.clearRect(0, 44, 128, 20);
+                for (int lane = 0; lane < routes->lanes(); ++lane) {
+                  int y = 45 + lane * 10;
+                  gfxPrint(0, y, routes->lanes() == 1 ? "Harmony" : lane ? "Voice 2" : "Voice 1");
+                  auto src = routes->source[lane];
+                  gfxPrint(50, y, src == qc::Local ? "Local" : src == qc::BusScale ? "QC Scale" : "QC Chord");
+                  if (zoom_cursor == 7 + lane) {
+                    if (isEditing) gfxInvert(49, y-1, 52, 9);
+                    else gfxFrame(49, y-1, 52, 9);
+                  }
+                }
+              }
+#endif
               gfxDisplayInputMapEditor();
             }
 
@@ -544,6 +569,8 @@ public:
             } else if (0 == zoom_cursor) {
               if (select_mode != zoom_slot && CursorBlink())
                 gfxIcon(64 - 8*zoom_slot, 1, zoom_slot? RIGHT_ICON : LEFT_ICON, true);
+            } else if (zoom_cursor > 6) {
+              // Harmony rows draw their own selection frame.
             } else if (isEditing) {
               const int x = 64*((zoom_cursor-1)%2);
               const int y = 13 + 10*((zoom_cursor-1)/2);
@@ -792,6 +819,12 @@ public:
                 if (!EditSelectedInputMap(event.value))
                   HS::cvmap[zoom_slot*2 + zoom_cursor - 3].ChangeSource(event.value);
                 break;
+#ifdef QUANTCORE_SUITE
+              case 7:
+              case 8:
+                if (auto* routes = routesFor(zoom_slot)) routes->nudge(zoom_cursor - 7, event.value);
+                break;
+#endif
               case 5:
               case 6:
                 if (h == LEFT_HEMISPHERE)
@@ -804,7 +837,11 @@ public:
                 break;
             }
           } else { // right enc moves cursor
-            zoom_cursor = constrain(zoom_cursor + event.value, 0, 6);
+            int last = 6;
+#ifdef QUANTCORE_SUITE
+            if (auto* routes = routesFor(zoom_slot)) last += routes->lanes();
+#endif
+            zoom_cursor = constrain(zoom_cursor + event.value, 0, last);
             ResetCursor();
           }
         } else if (select_mode == h) {
@@ -833,6 +870,7 @@ public:
 
     void SetFullScreen(int hemisphere) {
         zoom_slot = hemisphere;
+        if (zoom_cursor > 6) zoom_cursor = 0;
         select_mode = -1;
         isEditing = false;
         ClearEditInputMap();

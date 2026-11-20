@@ -23,7 +23,7 @@
 #include "../hem_arp_chord.h"
 #define HEM_CARPEGGIO_ANIMATION_SPEED 500
 
-class Carpeggio : public HemisphereApplet {
+class Carpeggio : public HarmonyApplet<qc::ChordOnly> {
 public:
 
     enum CarpeggioCursor {
@@ -49,6 +49,24 @@ public:
     }
 
     void Controller() {
+        const bool follow = source() == qc::BusChord;
+        if (follow && (!wasFollowing || revision != qc::harmonyRevision())) {
+            // Keep the Cartesian position. Refresh the imprint only when its
+            // effective note set changes, preserving edits on fine/root changes.
+            uint8_t mask[12];
+            auto& h = qc::harmony;
+            for (int i = 0; i < 12; ++i)
+                mask[i] = (h.chord[0] | h.chord[1] | h.chord[2]) ? h.chord[i % 3] : h.scale[i];
+            if (!wasFollowing || memcmp(mask, lastMask, sizeof(mask))) {
+                memcpy(lastMask, mask, sizeof(mask));
+                for (int i = 0; i < 16; ++i) degrees[i] = i;
+                busShuffle = false;
+            }
+            revision = qc::harmonyRevision();
+            replay = true;
+        }
+        if (wasFollowing && !follow) replay = true;
+        wasFollowing = follow;
         if (Clock(1)) { // Reset
             step = 0;
             reset = true;
@@ -62,8 +80,8 @@ public:
             if (DetentedIn(0) || DetentedIn(1)) {
                 int x = ProportionCV(In(0), 4, HEMISPHERE_MAX_INPUT_CV);
                 int y = ProportionCV(In(1), 4, HEMISPHERE_MAX_INPUT_CV);
-                if (x > 3) x = 3;
-                if (y > 3) y = 3;
+                x = constrain(x, 0, 3);
+                y = constrain(y, 0, 3);
                 step = (y * 4) + x;
                 pitch_out_for_step();
             } else {
@@ -97,6 +115,11 @@ public:
     }
 
     void OnButtonPress() {
+        if (source() && cursor == CHORD) { CancelEdit(); return; }
+        if (source() && cursor == SHUFFLE && !EditMode()) {
+            shuffleBus(!busShuffle);
+            return;
+        }
         if (cursor == SHUFFLE && !EditMode()) // special case toggle
             shuffle ? ImprintChord(sel_chord) : ShuffleChord();
         else // Advance or toggle cursor
@@ -117,9 +140,11 @@ public:
 
         switch ((CarpeggioCursor)cursor) {
         case NOTE_EDIT:
-            sequence[step] = constrain(sequence[step] + direction, -24, 60);
+            if (source()) degrees[step] = constrain(degrees[step] + direction, -24, 60);
+            else sequence[step] = constrain(sequence[step] + direction, -24, 60);
             break;
         case CHORD:
+            if (source()) break;
             chord = constrain(chord + direction, 0, Nr_of_arp_chords - 1);
             break;
         case TRANSPOSE:
@@ -127,6 +152,10 @@ public:
             break;
 
         case SHUFFLE:
+            if (source()) {
+                shuffleBus(direction > 0);
+                break;
+            }
             if (shuffle && direction < 0) {
                 ImprintChord(sel_chord);
             }
@@ -166,6 +195,19 @@ protected:
   }
 
 private:
+    int8_t degrees[16] = {};
+    uint8_t lastMask[12] = {};
+    uint32_t revision = 0;
+    bool wasFollowing = false, busShuffle = false;
+    int busNote = 60;
+    void shuffleBus(bool randomize) {
+        for (int i = 0; i < 16; ++i) {
+            if (randomize) std::swap(degrees[i], degrees[random(16)]);
+            else degrees[i] = i;
+        }
+        busShuffle = randomize;
+        replay = true;
+    }
     int cursor; // CarpeggioCursor
 
     // Sequencer state
@@ -186,10 +228,10 @@ private:
 
     void DrawSelector() {
         // Chord selector
-        gfxPrint(0, 15, Arp_Chords[chord].chord_name);
+        gfxPrint(0, 15, source() ? "QC Chord" : Arp_Chords[chord].chord_name);
         if (cursor == CHORD) {
             gfxCursor(1, 23, 53);
-            gfxBitmap(55, 14, 8, chord == sel_chord ? CHECK_ON_ICON : CHECK_OFF_ICON);
+            if (!source()) gfxBitmap(55, 14, 8, chord == sel_chord ? CHECK_ON_ICON : CHECK_OFF_ICON);
         }
 
         // Transpose editor
@@ -201,12 +243,12 @@ private:
         // Shuffle selector
         gfxBitmap(37, 36, 8, PLAY_ICON);
         gfxBitmap(49, 36, 8, LOOP_ICON);
-        gfxInvert(36 + (shuffle ? 12 : 0), 35, 10, 10);
+        gfxInvert(36 + ((source() ? busShuffle : shuffle) ? 12 : 0), 35, 10, 10);
         if (cursor == SHUFFLE) gfxCursor(36, 46, 22, 11);
 
         // Note name editor
         uint8_t midi_note = constrain(sequence[step] + 36 + transpose, 0, 127);
-        gfxPrint(38, 50, midi_note_numbers[midi_note]);
+        gfxPrint(38, 50, midi_note_numbers[source() ? busNote : midi_note]);
         if (cursor == NOTE_EDIT) gfxCursor(32, 58, 30);
     }
 
@@ -262,6 +304,16 @@ private:
     }
 
     void pitch_out_for_step() {
+        if (source()) {
+            const auto& tones = qc::notes(qc::BusChord);
+            if (tones.count) {
+                int base = tones.nearest((qc::harmony.root + transpose) * 128, false);
+                int i = constrain(base + degrees[step], 0, tones.count - 1);
+                busNote = constrain(int(tones.midi[i]), 0, 127);
+                Out(0, tones.pitch(i));
+            }
+            return;
+        }
         int note = sequence[step];
         Out(0, MIDIQuantizer::CV(note + 36, transpose));
     }

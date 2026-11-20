@@ -87,6 +87,8 @@ class Quantizer {
   void Configure(const Harmony& harmony, Selection selection = SCALE);
   bool enabled() const { return enabled_; }
   bool empty() const { return count_ == 0; }
+  uint8_t pattern_size() const { return count_; }
+  uint8_t pattern_note(uint8_t i) const { return notes_[i]; }
   bool Contains(int32_t identity) const;
   bool NextIdentity(int32_t at_or_above, int32_t* identity) const;
   bool PreviousIdentity(int32_t at_or_below, int32_t* identity) const;

@@ -31,7 +31,7 @@
  * with bits from benirose, and probably others!
  */
 
-class TwoRings : public HemisphereApplet {
+class TwoRings : public HarmonyApplet<qc::ScaleOrChord, qc::ScaleOrChord> {
 public:
 
     static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
@@ -202,19 +202,19 @@ public:
               int y = range_mod;
               int n = (note[0] * (y + x) + note[1] * (y - x)) / (2*y);
               if (!hold_pitch || (reg[0] & 0x01) || (reg[1] & 0x01))
-                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], n));
+                pitchOut(ch, n);
               break;
             }
             case PITCH1: {
               const bool hit = (reg[1] & 0x01);
               if (!hold_pitch || hit)
-                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[0] + note_trans[0]));
+                pitchOut(ch, note[0] + note_trans[0]);
               break;
             }
             case PITCH2: {
               const bool hit = (reg[0] & 0x01);
               if (!hold_pitch || hit)
-                slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], note[1] + note_trans[1]));
+                pitchOut(ch, note[1] + note_trans[1]);
               break;
             }
             case MOD1: // 8-bit bi-polar proportioned CV
@@ -230,7 +230,7 @@ public:
             case TRIGPITCH2: {
               const int rnum = outmode[ch] - TRIGPITCH1;
               const bool hit = (reg[1-rnum] & 0x01);
-              if (clk && hit) // trigger if 1st bit is high
+              if (clk && hit && (!source(ch) || qc::notes(source(ch)).count)) // pitched trigger
               {
                 Output[ch] = HEMISPHERE_MAX_CV;
                 trigpulse[ch] = HEMISPHERE_CLOCK_TICKS * trig_length;
@@ -240,7 +240,7 @@ public:
               {
                 // hold until it's time to pull it down
                 if (--trigpulse[ch] < 0)
-                  slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], (hold_pitch ? trigpitch_note[ch] : note[rnum]) + note_trans[rnum]));
+                  pitchOut(ch, (hold_pitch ? trigpitch_note[ch] : note[rnum]) + note_trans[rnum]);
               }
               break;
             }
@@ -452,6 +452,22 @@ private:
     OutputMode outmode[2] = {PITCH1, TRIG2};
     InputMode cvmode[2] = {LENGTH_MOD, RANGE_MOD};
 
+    void pitchOut(int ch, int degree) {
+      if (source(ch)) {
+        const auto& tones = qc::notes(source(ch));
+        int i = tones.nearest((degree - 64) * 128, false);
+        if (i >= 0) {
+          busPitch[ch] = tones.pitch(i);
+          slew(Output[ch], busPitch[ch]);
+        } else if (outmode[ch] == TRIGPITCH1 || outmode[ch] == TRIGPITCH2) {
+          // End any existing trigger at its last sounding pitch.
+          slew(Output[ch], busPitch[ch]);
+        }
+      } else {
+        slew(Output[ch], HS::QuantizerLookup(qselect_mod[ch], degree));
+      }
+    }
+    int busPitch[2] = {};
     void slew(int &old_val, const int new_val = 0) {
         const int s = 1 + smooth_mod;
         // more smoothing causes more ticks to be skipped
